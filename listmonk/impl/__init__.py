@@ -190,32 +190,44 @@ def list_by_id(list_id: int) -> Optional[models.MailingList]:
 
 
 def subscribers(
-    query_text: Optional[str] = None, list_id: Optional[int] = None
+        query_text: Optional[str] = None,
+        list_id: Optional[int] = None,
+        page: Optional[int] = None
 ) -> list[models.Subscriber]:
     """
-    Get a list of subscribers matching the criteria provided. If none, then all subscribers are returned.
+    Get a list of subscribers matching the criteria provided.
+
     Args:
-        query_text: Custom query text such as "subscribers.attribs->>'city' = 'Portland'". See the full documentation at https://listmonk.app/docs/querying-and-segmentation/
-        list_id: Pass a list ID and get the subscribers, matching the query, from that list.
-    Returns: A list of subscribers matching the criteria provided. If none, then all subscribers are returned.
-    """ # noqa
+        query_text: Custom query text such as "subscribers.attribs->>'city' = 'Portland'".
+        list_id: ID of the list to filter subscribers.
+        page: Page number for paginated results (returns only this page if specified).
+        per_page: Number of results per page (used only when page is specified).
+
+    Returns:
+        list[models.Subscriber]: List of subscribers matching the criteria.
+                                If page is specified, returns only that page's results.
+                                Otherwise returns all matching subscribers.
+    """
     global core_headers
     validate_state(url=True)
 
+    # Если указана пагинация, возвращаем только запрошенную страницу
+    if page is not None:
+        raw_results, more = _fragment_of_subscribers(page, list_id, query_text)
+        return [models.Subscriber(**d) for d in raw_results]
+
+    # Исходная логика (получение всех подписчиков)
     raw_results = []
     page_num = 1
     partial_results, more = _fragment_of_subscribers(page_num, list_id, query_text)
     raw_results.extend(partial_results)
-    # Logging someday: print(f"subscribers(): Got {len(raw_results)} so far, more? {more}")
+
     while more:
         page_num += 1
         partial_results, more = _fragment_of_subscribers(page_num, list_id, query_text)
         raw_results.extend(partial_results)
-        # Logging someday: print(f"subscribers(): Got {len(raw_results)} so far on page {page_num}, more? {more}")
 
-    subscriber_list = [models.Subscriber(**d) for d in raw_results]
-
-    return subscriber_list
+    return [models.Subscriber(**d) for d in raw_results]
 
 
 # endregion
